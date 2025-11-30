@@ -1,0 +1,14 @@
+# Python caches
+**/__pycache__/
+
+# Environment
+BackendAPI/.env
+
+# Videos / clips
+Frontend/videos/*
+BackendAPI/clips/*
+BackendAPI/videos/*
+
+# Ignore MP4 files globally
+*.mp4
+*.avi
