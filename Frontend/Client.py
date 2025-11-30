@@ -1,7 +1,7 @@
 import requests
 
 API_URL = "http://localhost:8000/upload-video"
-VIDEO_PATH = "./videos/test.mp4"   # Your test video
+VIDEO_PATH = "./videos/ThreeClips.mp4"   # Your test video
 
 with open(VIDEO_PATH, "rb") as f:
     files = {"file": (VIDEO_PATH, f, "video/mp4")}
