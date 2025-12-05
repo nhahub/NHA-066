@@ -6,8 +6,7 @@
 App/BackendAPI/.env
 
 # Videos / clips
-App/Frontend/TestingFrontend/videos/*
-App/Frontend/TestingFrontend/receivedVideos/*
+App/Frontend/TestingFrontend
 App/BackendAPI/videos/*
 
 # Ignore MP4 files globally
