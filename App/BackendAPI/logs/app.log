@@ -1,0 +1,19 @@
+2025-12-02 20:01:17,672 - INFO - anomaly_app - Device chosen: cpu
+2025-12-02 20:01:17,822 - INFO - anomaly_app - YOLO model moved to device.
+2025-12-02 20:01:17,824 - INFO - anomaly_app - ThreadPoolExecutor created with max_workers=15
+2025-12-02 20:01:31,285 - INFO - anomaly_app - Saved uploaded video: videos\599a9a87-b986-4cdf-870a-59d21f5cf076.mp4 (video_id=599a9a87-b986-4cdf-870a-59d21f5cf076)
+2025-12-02 20:03:25,913 - INFO - anomaly_app - cut_anomalies returned 3 clips for video_id=599a9a87-b986-4cdf-870a-59d21f5cf076
+2025-12-02 20:03:27,724 - INFO - anomaly_app - Upscaled: videos\resized\599a9a87-b986-4cdf-870a-59d21f5cf076_42.52_49.64.mp4
+2025-12-02 20:03:27,796 - INFO - anomaly_app - Upscaled: videos\resized\599a9a87-b986-4cdf-870a-59d21f5cf076_0.00_13.84.mp4
+2025-12-02 20:03:27,797 - INFO - anomaly_app - Upscaled: videos\resized\599a9a87-b986-4cdf-870a-59d21f5cf076_17.88_33.88.mp4
+2025-12-02 20:04:02,649 - INFO - anomaly_app - Processed clip 42.52_49.64.mp4 (start=42.52 end=49.64) for video_id=599a9a87-b986-4cdf-870a-59d21f5cf076
+2025-12-02 20:04:25,978 - INFO - anomaly_app - Processed clip 0.00_13.84.mp4 (start=0.0 end=13.84) for video_id=599a9a87-b986-4cdf-870a-59d21f5cf076
+2025-12-02 20:04:33,414 - INFO - anomaly_app - Processed clip 17.88_33.88.mp4 (start=17.88 end=33.88) for video_id=599a9a87-b986-4cdf-870a-59d21f5cf076
+2025-12-02 20:04:33,414 - INFO - anomaly_app - All clip processing finished for video_id=599a9a87-b986-4cdf-870a-59d21f5cf076. Returning response.
+2025-12-02 20:46:24,845 - INFO - anomaly_app - Device chosen: cuda:0
+2025-12-02 20:46:24,996 - INFO - anomaly_app - YOLO model moved to device.
+2025-12-02 20:46:24,996 - INFO - anomaly_app - ThreadPoolExecutor created with max_workers=15
+2025-12-02 20:47:09,002 - INFO - anomaly_app - Saved uploaded video: videos\91349602-5267-44c0-a9e8-c9a1bcea8adf.mp4 (video_id=91349602-5267-44c0-a9e8-c9a1bcea8adf)
+2025-12-02 20:48:03,161 - INFO - anomaly_app - Device chosen: cuda:0
+2025-12-02 20:48:03,312 - INFO - anomaly_app - YOLO model moved to device.
+2025-12-02 20:48:03,312 - INFO - anomaly_app - ThreadPoolExecutor created with max_workers=15
