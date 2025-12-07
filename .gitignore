@@ -8,8 +8,12 @@ App/BackendAPI/.env
 # Videos / clips
 App/Frontend/TestingFrontend
 App/BackendAPI/videos/*
+App/BackendAPI/thumbnails
 
 # Ignore MP4 files globally
 *.mp4
 *.avi
+*.png
+*.jpg
+*.jpeg
 
