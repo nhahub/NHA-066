@@ -14,10 +14,8 @@ class ReporterAPI:
         self.index_id = "692b671dd7a0bf13a3b4e09e"
 
     def summary(self, file_path: str) -> str:
-        """
-        Uploads a video, indexes it, waits until it's ready,
-        then generates and returns a summary.
-        """
+
+        SUMMARY_PROMPT = os.getenv("SUMMARY_PROMPT")
 
         # 1. Upload
         asset = self.client.assets.create(
@@ -42,7 +40,7 @@ class ReporterAPI:
                 result = self.client.summarize(
                     video_id=indexed_asset.id,
                     type="summary",
-                    prompt="Summarize this video",
+                    prompt=SUMMARY_PROMPT,
                     temperature=0.3
                 )
                 break

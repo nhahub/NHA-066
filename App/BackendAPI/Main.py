@@ -10,6 +10,8 @@ from ultralytics import YOLO
 from Helpers.YOLO_detector import cut_anomalies
 import base64
 from routes.userAuth import router as authRoute
+from routes.gallery import router as galleryRoute
+from routes.clips import router as clipRoutes
 from services.hasher import tokenizer
 from DBconnect.DBconnection import add_video
 
@@ -34,6 +36,8 @@ app.add_middleware(
 )
 
 app.include_router(authRoute)
+app.include_router(galleryRoute)
+app.include_router(clipRoutes)
 
 
 
@@ -120,7 +124,7 @@ async def upload_video(
         resized = autoscale_video(clip, resized_path)
 
         # Generate summary (real call, not a string)
-        gen_summary = "reporter.summary(resized)"
+        gen_summary = reporter.summary(resized)
 
         add_video(userId,final_name,save_path,basename,clip,gen_summary)
         # Base64 encode resized clip

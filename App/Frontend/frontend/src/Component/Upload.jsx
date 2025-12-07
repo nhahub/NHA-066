@@ -13,6 +13,7 @@ import { getToken, removeToken } from "../HelperFunctions/token.js";
 function Upload() {
   const [state, setState] = useState("idle");
   const [file, setFile] = useState(null);
+  const [fileId, setFileId] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(HTMLInputElement);
   const navigate = useNavigate();
@@ -73,7 +74,7 @@ function Upload() {
         body: formData,
       });
       const data = await response.json();
-      console.log(data);
+      setFileId(data.file_name);
       if (data.message == "invaild token") {
         setState("Invalid Token");
         removeToken();
@@ -88,10 +89,9 @@ function Upload() {
     }
   };
 
-  const handleGoToResults = () => {
-    alert("Navigating to results...");
+  const handleGoToResults = (e) => {
+    navigate(`/Clip/${fileId}`);
   };
-
   const handleRetry = () => {
     setState("idle");
     setFile(null);

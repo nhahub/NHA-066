@@ -15,6 +15,10 @@ function Home() {
     navigate("/Upload");
   };
 
+  const handleGallery = () => {
+    navigate("/Gallery");
+  };
+
   return (
     <div className="home-page">
       <div className="home-container">
@@ -58,7 +62,9 @@ function Home() {
               </div>
               <h3>Gallery</h3>
               <p>Browse your detection history and saved results</p>
-              <button className="option-button">View</button>
+              <button className="option-button" onClick={handleGallery}>
+                View
+              </button>
             </div>
           </div>
         </div>
