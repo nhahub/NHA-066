@@ -18,6 +18,9 @@ function Home() {
   const handleGallery = () => {
     navigate("/Gallery");
   };
+  const handleRealTime = () => {
+    navigate("/RealTime");
+  };
 
   return (
     <div className="home-page">
@@ -53,7 +56,9 @@ function Home() {
               </div>
               <h3>Real-Time</h3>
               <p>Monitor live stream for anomalies in real-time</p>
-              <button className="option-button">Start</button>
+              <button className="option-button" onClick={handleRealTime}>
+                Start
+              </button>
             </div>
 
             <div className="option-card">

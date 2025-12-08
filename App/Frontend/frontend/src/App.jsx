@@ -8,6 +8,7 @@ import UploadPage from "./Pages/UploadPage.jsx";
 import GalleryPage from "./Pages/GalleryPage.jsx";
 import Redirect from "./Pages/Redirect.jsx";
 import ClipPage from "./Pages/ClipPage.jsx";
+import RealTimePage from "./Pages/RealTimePage.jsx";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/Auth" element={<AuthPage />} />
         <Route path="/Home" element={<HomePage />} />
         <Route path="/Upload" element={<UploadPage />} />
+        <Route path="/RealTime" element={<RealTimePage />} />
         <Route path="/Gallery" element={<GalleryPage />} />
         <Route path="/Clip/:clip_id" element={<ClipPage />} />
       </Routes>

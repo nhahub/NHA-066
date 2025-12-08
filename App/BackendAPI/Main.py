@@ -1,5 +1,5 @@
 import uuid
-from fastapi import FastAPI, UploadFile, File,Form
+from fastapi import FastAPI, UploadFile, File,Form,WebSocket,WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
@@ -14,11 +14,15 @@ from routes.gallery import router as galleryRoute
 from routes.clips import router as clipRoutes
 from services.hasher import tokenizer
 from DBconnect.DBconnection import add_video
+from WebSocket.websocket_manager import WebSocketManager
+import cv2
+import numpy as np
 
 
 
 app = FastAPI()
 reporter = ReporterAPI()
+ws_manager = WebSocketManager()
 yolo_model = YOLO("./Models/best.pt")
 tokenizer = tokenizer()
 
@@ -147,15 +151,22 @@ async def upload_video(
     }
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("Client connected!")
 
-@app.get("/test")
-def test():
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            np_arr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                print("Failed to decode frame")
+                continue
+            await websocket.send_text("frame_received")
 
-    video_path = "./ThreeClips.mp4"
-    clips = cut_anomalies(video_path, yolo_model, clips_dir="clips")
-
-    print("Generated clips:")
-    for clip in clips:
-        print(clip)
-
-
+    except WebSocketDisconnect:
+        print("Client disconnected")
+    except Exception as e:
+        print("Error:", e)
