@@ -10,37 +10,103 @@ import {
 import useMediaStream from "../hooks/useMediaStream.js";
 import useDetections from "../hooks/useDetections.js";
 import "./styles/realtime.css";
-import { getToken } from "../HelperFunctions/token.js";
-import { useNavigate } from "react-router-dom";
-
-// ----------------------
-
 import useSocket from "../hooks/useSocket";
 import useFrameSender from "../hooks/useFrameSender";
+import { getToken } from "../HelperFunctions/token.js";
 
-function RealTime() {
+function RealTime({ onBack }) {
   const [state, setState] = useState("selection");
   const [error, setError] = useState(null);
+  const [detections, setDetections] = useState([]);
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const logsContainerRef = useRef(null);
-  const navigate = useNavigate();
+  const token = getToken();
+  const socket = useSocket(`ws://localhost:8000/ws?token=${token}`, (msg) => {
+    try {
+      const data = JSON.parse(msg);
+      console.log("Detection:", data);
 
-  const socket = useSocket("ws://localhost:8000/ws", (msg) => {
-    console.log("Detection:", msg);
+      if (data.type === "detection" && data.detections) {
+        setDetections(data.detections);
+
+        // Add to logs
+        data.detections.forEach((det) => {
+          const logEntry = {
+            id: Date.now() + Math.random(),
+            action: det.class,
+            timestamp: det.timestamp,
+            confidence: det.confidence,
+          };
+          // You can call a function to add this to your logs
+          console.log("New detection log:", logEntry);
+        });
+      } else {
+        setDetections([]);
+      }
+    } catch (e) {
+      console.log("Non-JSON message:", msg);
+    }
   });
-
-  const handleBack = () => navigate("/Home");
 
   const { start: startFrameSending, stop: stopFrameSending } = useFrameSender(
     socket.send
   );
 
+  // Draw bounding boxes on canvas
+  useEffect(() => {
+    if (!canvasRef.current || !videoRef.current) return;
+
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const ctx = canvas.getContext("2d");
+
+    // Match canvas size to video size
+    canvas.width = video.videoWidth || video.clientWidth;
+    canvas.height = video.videoHeight || video.clientHeight;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw bounding boxes
+    detections.forEach((det) => {
+      const { x1, y1, x2, y2 } = det.bbox;
+      const width = x2 - x1;
+      const height = y2 - y1;
+
+      // Scale coordinates to canvas size
+      const scaleX = canvas.width / video.videoWidth;
+      const scaleY = canvas.height / video.videoHeight;
+
+      const scaledX = x1 * scaleX;
+      const scaledY = y1 * scaleY;
+      const scaledWidth = width * scaleX;
+      const scaledHeight = height * scaleY;
+
+      // Draw box
+      ctx.strokeStyle = "#00ff00";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
+
+      // Draw label background
+      const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
+      ctx.font = "16px Arial";
+      const textWidth = ctx.measureText(label).width;
+
+      ctx.fillStyle = "#00ff00";
+      ctx.fillRect(scaledX, scaledY - 25, textWidth + 10, 25);
+
+      // Draw label text
+      ctx.fillStyle = "#000";
+      ctx.fillText(label, scaledX + 5, scaledY - 7);
+    });
+  }, [detections]);
+
   useEffect(() => {
     if (state === "streaming" && videoRef.current) {
-      // wait for video to be ready
       const videoElement = videoRef.current;
       const onLoaded = () => {
-        startFrameSending(videoElement, 6); // send 4 FPS
+        startFrameSending(videoElement, 10); // send 4 FPS
       };
 
       videoElement.addEventListener("loadeddata", onLoaded);
@@ -99,16 +165,21 @@ function RealTime() {
     stopSimulation();
     stopMedia();
     resetLogs();
+    setDetections([]);
     setState("selection");
     setError(null);
   };
 
   const getActionIcon = (action) => {
     switch (action) {
-      case "fire":
-        return { icon: Flame, color: "#ef4444" };
-      case "fight":
+      case "person":
+        return { icon: AlertCircle, color: "#3b82f6" };
+      case "car":
+      case "truck":
         return { icon: Zap, color: "#f97316" };
+      case "fire":
+      case "fire hydrant":
+        return { icon: Flame, color: "#ef4444" };
       default:
         return { icon: AlertCircle, color: "#eab308" };
     }
@@ -119,7 +190,7 @@ function RealTime() {
       <div className="detection-page">
         <div className="detection-container">
           <button
-            onClick={handleBack}
+            onClick={onBack}
             className="back-button"
             onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
@@ -167,7 +238,7 @@ function RealTime() {
       <div className="detection-page">
         <div className="detection-container">
           <button
-            onClick={handleBack}
+            onClick={onBack}
             className="back-button"
             onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
@@ -198,7 +269,7 @@ function RealTime() {
     <div className="detection-page">
       <div className="detection-container streaming">
         <button
-          onClick={handleBack}
+          onClick={onBack}
           className="back-button"
           onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
@@ -216,12 +287,23 @@ function RealTime() {
               </button>
             </div>
 
-            <div className="video-container">
+            <div className="video-container" style={{ position: "relative" }}>
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 className="detection-video"
+              />
+              <canvas
+                ref={canvasRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                }}
               />
             </div>
           </div>
@@ -255,6 +337,8 @@ function RealTime() {
                       <div className="log-content">
                         <div className="log-action" style={{ color }}>
                           {log.action.toUpperCase()}
+                          {log.confidence &&
+                            ` (${(log.confidence * 100).toFixed(0)}%)`}
                         </div>
                         <div className="log-time">{log.timestamp}</div>
                       </div>

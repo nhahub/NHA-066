@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from fastapi import FastAPI, UploadFile, File,Form,WebSocket,WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -16,19 +17,27 @@ from services.hasher import tokenizer
 from DBconnect.DBconnection import add_video
 from WebSocket.websocket_manager import WebSocketManager
 import cv2
+import json
 import numpy as np
+from classes.VideoRecorder import VideoRecorder
 
 
 
 app = FastAPI()
 reporter = ReporterAPI()
 ws_manager = WebSocketManager()
-yolo_model = YOLO("./Models/best.pt")
+yolo_model = YOLO("./Models/fire_model.pt")
 tokenizer = tokenizer()
+
+active_users = {}          # connection_id → userId
+active_realtime_names = {} # connection_id → videoName
+
 
 
 # Create videos folder if not exists
 VIDEO_DIR = "videos"
+CLIPS_DIR = "detection_clips"
+os.makedirs(CLIPS_DIR, exist_ok=True)
 os.makedirs(VIDEO_DIR, exist_ok=True)
 # Allow all clients (optional)
 app.add_middleware(
@@ -92,7 +101,6 @@ async def upload_video(
     if not userId: 
         return {"message": "invaild token"}
 
-    # print("vaild tilll here")
     file_id = uuid.uuid4().hex[:8]
 
     final_name = f"{file_id}_{filename}"
@@ -153,20 +161,90 @@ async def upload_video(
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.query_params.get("token")
+    userId = tokenizer.token_validated(token)
+    if not userId:
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
+
     print("Client connected!")
+    connection_id = id(websocket)
+    active_users[connection_id] = userId
+
+    short_uuid = uuid.uuid4().hex[:8]
+    start_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    videoName = f"RealTime_{short_uuid}_{start_time_str}"
+
+    active_realtime_names[connection_id] = videoName
+    print(f"🎥 RealTime session started: {videoName}")
+
+    recorder = VideoRecorder(
+        buffer_duration=2.0,
+        fps=10,
+        userId=userId,
+        videoName=videoName
+    ) 
 
     try:
         while True:
+            # Receive bytes
             data = await websocket.receive_bytes()
+
+            # Decode JPEG → frame
             np_arr = np.frombuffer(data, np.uint8)
             frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             if frame is None:
-                print("Failed to decode frame")
+                print("Frame decode failed")
                 continue
-            await websocket.send_text("frame_received")
+
+            # YOLO detection
+            results = yolo_model(frame, verbose=False)
+
+            detections = []
+            detection_occurred = False
+
+            for result in results:
+                for box in result.boxes:
+                    class_id = int(box.cls[0])
+                    class_name = yolo_model.names[class_id]
+                    conf = float(box.conf[0])
+
+                    # Get box coords
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                    detections.append({
+                        "class": class_name,
+                        "confidence": round(conf, 2),
+                        "bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
+                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                    })
+
+                    detection_occurred = True
+
+            # Add frame to recorder
+            recorder.add_frame(frame, has_detection=detection_occurred)
+
+            # Start recording
+            if detection_occurred and not recorder.is_recording:
+                recorder.start_recording(detections[0]["class"])
+
+            # Send response to frontend
+            await websocket.send_text(json.dumps({
+                "type": "detection" if detection_occurred else "frame",
+                "detections": detections
+            }))
 
     except WebSocketDisconnect:
         print("Client disconnected")
+        if recorder.is_recording:
+            recorder.stop_recording()
+
     except Exception as e:
         print("Error:", e)
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

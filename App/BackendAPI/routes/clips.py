@@ -27,6 +27,8 @@ async def getVideo(token: str = Form(...), videoName: str = Form(...)):
     videos = get_videos(userId)
 
     # Find video
+    if(videoName[:8] == "RealTime"):\
+        return ""
     video = next((v for v in videos if v.get("videoName") == videoName), None)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -87,13 +89,24 @@ async def getClipList(token: str = Form(...), videoName: str = Form(...)):
 
     clipObj = []
     for clip in clips:
-        clipObj.append(
-             {
-          "id": clip.get("clipName"),
-          "thumbnail": image_to_base64(clip.get("thumbnail")),
-          "startTime": clip.get("clipName").split('_')[0],
-          "endTime": clip.get("clipName").split('_')[1][:-4],
-          "description":clip.get("summary"),
-        },
-        )
+        if(videoName[:8] == "RealTime"):
+            clipObj.append(
+                    {
+                "id": clip.get("clipName"),
+                "thumbnail": image_to_base64(clip.get("thumbnail")),
+                "startTime": clip.get("clipName").split(' - ')[0],
+                "endTime": clip.get("clipName").split(' - ')[1][:-4],
+                "description":clip.get("summary"),
+                },
+                )
+        else:
+            clipObj.append(
+                {
+            "id": clip.get("clipName"),
+            "thumbnail": image_to_base64(clip.get("thumbnail")),
+            "startTime": clip.get("clipName").split('_')[0],
+            "endTime": clip.get("clipName").split('_')[1][:-4],
+            "description":clip.get("summary"),
+            },
+            )
     return clipObj

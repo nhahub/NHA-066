@@ -5,9 +5,9 @@ import { useNavigate } from "react-router-dom";
 
 export default function RealTimePage() {
   const navigate = useNavigate();
-  useEffect(() => {
-    if (!getToken()) navigate("/Auth");
-  }, [navigate, getToken]);
+  // useEffect(() => {
+  //   if (!getToken()) navigate("/Auth");
+  // }, [navigate, getToken]);
 
   return (
     <div>

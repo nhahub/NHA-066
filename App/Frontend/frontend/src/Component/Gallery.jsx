@@ -37,12 +37,32 @@ function Gallery() {
         const gal = [];
 
         for (const video of data) {
-          gal.push({
-            id: video.id,
-            name: video.name, // must match backend key
-            thumbnail: video.thumbnail, // must match backend key
-            clipCount: video.clipsCount, // must match backend key
-          });
+          if (video.id == "RealTime") {
+            gal.push({
+              id: video.id + "_" + video.name,
+              name:
+                video.id +
+                "_" +
+                video.name.substr(15, 2) +
+                "-" +
+                video.name.substr(13, 2) +
+                "-" +
+                video.name.substr(9, 4) +
+                "_" +
+                video.name.substr(18, 2) +
+                ":" +
+                video.name.substr(20, 2), // must match backend key
+              thumbnail: video.thumbnail, // must match backend key
+              clipCount: video.clipsCount, // must match backend key
+            });
+          } else {
+            gal.push({
+              id: video.id + "_" + video.name,
+              name: video.name, // must match backend key
+              thumbnail: video.thumbnail, // must match backend key
+              clipCount: video.clipsCount, // must match backend key
+            });
+          }
         }
         console.log(gal);
         setVideos(gal);
@@ -97,7 +117,9 @@ function Gallery() {
               <div
                 key={video.id}
                 className="video-card"
-                onClick={() => handelVideoSelected(video.id + "_" + video.name)}
+                onClick={() => {
+                  handelVideoSelected(video.id);
+                }}
               >
                 <div className="video-thumbnail-wrapper">
                   <img

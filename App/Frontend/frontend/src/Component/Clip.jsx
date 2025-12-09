@@ -33,6 +33,7 @@ function Clip({ videoId, video_Id }) {
       });
 
       if (response.ok) {
+        console.log("WORKINNNNNNNNNNNNNNNNNG");
         const blob = await response.blob();
         const videoURL = URL.createObjectURL(blob);
 
@@ -185,31 +186,33 @@ function Clip({ videoId, video_Id }) {
             </div>
 
             <div className="clips-list">
-              <div
-                className={`clip-item full-video-item ${
-                  showFullVideo ? "active" : ""
-                }`}
-                onClick={handleFullVideoClick}
-              >
-                <div className="clip-thumbnail-wrapper full-video-thumb">
-                  <img
-                    src="https://images.pexels.com/photos/3807517/pexels-photo-3807517.jpeg?auto=compress&cs=tinysrgb&w=100"
-                    alt="Full Video"
-                    className="clip-thumbnail"
-                  />
-                  <div className="clip-play-overlay">
-                    <Play size={20} />
+              {video_Id.substr(0, 8) !== "RealTime" && (
+                <div
+                  className={`clip-item full-video-item ${
+                    showFullVideo ? "active" : ""
+                  }`}
+                  onClick={handleFullVideoClick}
+                >
+                  <div className="clip-thumbnail-wrapper full-video-thumb">
+                    <img
+                      src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAP8AAADGCAMAAAAqo6adAAAABlBMVEUAAAAORKmU5gWIAAAA3klEQVR4nO3PAQEAAAjDoNu/tEEYDdjN1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W39bf1t/W34b/H769AMf5McvaAAAAAElFTkSuQmCC"
+                      alt="Full Video"
+                      className="clip-thumbnail"
+                    />
+                    <div className="clip-play-overlay">
+                      <Play size={20} />
+                    </div>
                   </div>
-                </div>
 
-                <div className="clip-details">
-                  <div className="clip-time-range">
-                    <span className="time-badge full-video-badge">
-                      Full Video
-                    </span>
+                  <div className="clip-details">
+                    <div className="clip-time-range">
+                      <span className="time-badge full-video-badge">
+                        Full Video
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {clips.map((clip) => (
                 <div

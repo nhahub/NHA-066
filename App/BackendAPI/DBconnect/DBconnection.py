@@ -5,10 +5,12 @@ from services.hasher import PasswordHasher  # make sure the folder name is corre
 from uuid import uuid4
 from datetime import datetime
 from Helpers.ThumbnailGenerator import generateThumbnail
+from Helpers.reporter_api import ReporterAPI
+import asyncio
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 client = MongoClient(DB_CONNECTION)
-
+summrizer = ReporterAPI()
 hasher = PasswordHasher()
 db = client["YoloAnomolyDedectionDB"]
 users_col = db["YoloUsersVideos"]
@@ -89,3 +91,47 @@ def get_videos(userId):
 
     return user.get("videos", [])
 
+def add_realtime_clips(userId, videoName, clipName, clipPath):
+    clip_thumb = generateThumbnail(clipPath)
+    summary = "summrizer.summary(clipPath)"
+    result = users_col.update_one(
+        {"_id": userId, "videos.videoName": videoName},
+        {"$push": {
+            "videos.$.clips": {
+                "clipName": clipName,
+                "clipPath": pathCorrector(clipPath),
+                "summary":summary,
+                "thumbnail":pathCorrector(clip_thumb)
+            }
+        }}
+    )
+
+    if result.matched_count > 0:
+        return True
+    
+    new_video = {
+        "videoName": videoName,
+        "videoPath": "",
+        "videoThumb":clip_thumb,
+        "clips": [
+            {
+                "clipName": clipName,
+                "clipPath": pathCorrector(clipPath),
+                "summary":summary,
+                "thumbnail":pathCorrector(clip_thumb)
+            }
+        ]
+    }
+
+    users_col.update_one(
+        {"_id": userId},
+        {"$push": {"videos": new_video}}
+    )
+
+async def add_realtime_clips_async(userId, videoName, clipName, clipPath):
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None,  # ThreadPool
+        add_realtime_clips,
+        userId, videoName, clipName, clipPath
+    )
