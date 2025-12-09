@@ -4,7 +4,26 @@ from collections import deque
 
 import os
 import asyncio
-from DBconnect.DBconnection import add_realtime_clips_async
+from DBconnect.DBconnection import add_realtime_clips_async,schedule_async_task
+import subprocess
+
+def convert_to_mp4(input_path):
+    output_path = input_path.replace(".avi", ".mp4")
+
+    subprocess.run([
+        "ffmpeg",
+        "-y",
+        "-i", input_path,
+        "-vcodec", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-pix_fmt", "yuv420p",  # critical for browser playback
+        output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    os.remove(input_path)  # delete the original AVI
+    return output_path
+
 
 class VideoRecorder:
 
@@ -76,24 +95,29 @@ class VideoRecorder:
         clip_end_time = datetime.now()
         clip_name = f"{self.clip_start_time.strftime('%H:%M:%S')} - {clip_end_time.strftime('%H:%M:%S')}"
 
-        height, width = self.recording_buffer[0].shape[:2]
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        # ✅ Convert filename to .avi
+        self.current_filename = self.current_filename.replace(".mp4", ".avi")
 
+        height, width = self.recording_buffer[0].shape[:2]
+
+        # ✅ XVID codec (works everywhere)
+        fourcc = cv2.VideoWriter_fourcc(*"XVID")
         writer = cv2.VideoWriter(self.current_filename, fourcc, self.fps, (width, height))
+
         for frame in self.recording_buffer:
             writer.write(frame)
         writer.release()
 
-        clip_path = self.current_filename
+        clip_path = convert_to_mp4(self.current_filename)
 
         print(f"✅ Clip saved: {clip_path}")
 
-        asyncio.create_task(
-            add_realtime_clips_async(self.userId, self.videoName, clip_name, clip_path)
-        )
+        schedule_async_task(self.userId, add_realtime_clips_async(self.userId, self.videoName, clip_name, clip_path))
+
 
         self.recording_buffer = []
         self.current_filename = None
         self.clip_start_time = None
+
 
 

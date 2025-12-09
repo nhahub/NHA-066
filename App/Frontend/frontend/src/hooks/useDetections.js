@@ -2,49 +2,38 @@ import { useState, useRef } from "react";
 
 export default function useDetections() {
   const [logs, setLogs] = useState([]);
-  const intervalRef = useRef(null);
+  const lastDetectionRef = useRef({}); // { className: timestamp }
 
-  const startSimulation = () => {
-    stopSimulation();
+  const addDetections = (detections) => {
+    const now = Date.now();
 
-    const actions = [
-      { action: "fire", severity: "critical" },
-      { action: "fight", severity: "critical" },
-      { action: "danger", severity: "high" },
-      { action: "alert", severity: "medium" },
-    ];
-
-    intervalRef.current = setInterval(() => {
-      if (Math.random() > 0.6) {
-        const randomAction =
-          actions[Math.floor(Math.random() * actions.length)];
-        const now = new Date();
-        const logEntry = {
-          id: `${Date.now()}-${Math.random()}`,
-          action: randomAction.action,
-          timestamp: now.toLocaleTimeString(),
-          severity: randomAction.severity,
+    const newLogs = detections
+      .filter((det) => {
+        const lastTime = lastDetectionRef.current[det.class] || 0;
+        // Allow logging if more than 5 seconds passed or if it's a new class
+        return now - lastTime > 5000;
+      })
+      .map((det) => {
+        lastDetectionRef.current[det.class] = now; // update last detection time
+        return {
+          id: now + Math.random(),
+          action: det.class,
+          timestamp: det.timestamp,
+          confidence: det.confidence,
         };
-        setLogs((prev) => [...prev, logEntry]);
-      }
-    }, 2000);
-  };
+      });
 
-  const stopSimulation = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (newLogs.length > 0) setLogs((prev) => [...prev, ...newLogs]);
   };
 
   const resetLogs = () => {
     setLogs([]);
+    lastDetectionRef.current = {};
   };
 
   return {
     logs,
-    startSimulation,
-    stopSimulation,
+    addDetections,
     resetLogs,
   };
 }

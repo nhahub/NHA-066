@@ -33,7 +33,6 @@ function Clip({ videoId, video_Id }) {
       });
 
       if (response.ok) {
-        console.log("WORKINNNNNNNNNNNNNNNNNG");
         const blob = await response.blob();
         const videoURL = URL.createObjectURL(blob);
 

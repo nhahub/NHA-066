@@ -1,4 +1,5 @@
 import os
+from fastapi import APIRouter,Form
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from services.hasher import PasswordHasher  # make sure the folder name is correct
@@ -6,14 +7,17 @@ from uuid import uuid4
 from datetime import datetime
 from Helpers.ThumbnailGenerator import generateThumbnail
 from Helpers.reporter_api import ReporterAPI
+from services.hasher import tokenizer
 import asyncio
 load_dotenv()
 DB_CONNECTION = os.getenv("DB_CONNECTION")
 client = MongoClient(DB_CONNECTION)
+tokenizer = tokenizer()
 summrizer = ReporterAPI()
 hasher = PasswordHasher()
 db = client["YoloAnomolyDedectionDB"]
 users_col = db["YoloUsersVideos"]
+user_tasks = {}  # key: userId, value: set of asyncio.Task
 
 def pathCorrector(path):
     return  path.replace("\\", "/")
@@ -135,3 +139,36 @@ async def add_realtime_clips_async(userId, videoName, clipName, clipPath):
         add_realtime_clips,
         userId, videoName, clipName, clipPath
     )
+
+def schedule_async_task(userId, coro):
+    """
+    Schedule an async task for a user and track it.
+    """
+    if userId not in user_tasks:
+        user_tasks[userId] = set()
+
+    task = asyncio.create_task(coro)
+    user_tasks[userId].add(task)
+
+    def _on_done(t):
+        user_tasks[userId].discard(t)
+
+    task.add_done_callback(_on_done)
+    return task
+
+
+router = APIRouter()
+
+@router.post("/tasks_finished")
+async def tasks_finished(token: str = Form(...)):
+
+    userId = tokenizer.token_validated(token)
+    if not userId:
+        return "Error"
+    
+    tasks = user_tasks.get(userId, set())
+    if not tasks:
+        return {"finished": True}
+
+    running = any(not t.done() for t in tasks)
+    return {"finished": not running}

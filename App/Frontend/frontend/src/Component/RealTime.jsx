@@ -6,6 +6,7 @@ import {
   Flame,
   Zap,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import useMediaStream from "../hooks/useMediaStream.js";
 import useDetections from "../hooks/useDetections.js";
@@ -13,45 +14,139 @@ import "./styles/realtime.css";
 import useSocket from "../hooks/useSocket";
 import useFrameSender from "../hooks/useFrameSender";
 import { getToken } from "../HelperFunctions/token.js";
+import { useNavigate } from "react-router-dom";
 
-function RealTime({ onBack }) {
+function RealTime() {
   const [state, setState] = useState("selection");
   const [error, setError] = useState(null);
   const [detections, setDetections] = useState([]);
+  const [isEnding, setIsEnding] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const logsContainerRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
   const token = getToken();
-  const socket = useSocket(`ws://localhost:8000/ws?token=${token}`, (msg) => {
-    try {
-      const data = JSON.parse(msg);
-      console.log("Detection:", data);
+  const navigate = useNavigate();
 
-      if (data.type === "detection" && data.detections) {
-        setDetections(data.detections);
-
-        // Add to logs
-        data.detections.forEach((det) => {
-          const logEntry = {
-            id: Date.now() + Math.random(),
-            action: det.class,
-            timestamp: det.timestamp,
-            confidence: det.confidence,
-          };
-          // You can call a function to add this to your logs
-          console.log("New detection log:", logEntry);
-        });
-      } else {
-        setDetections([]);
-      }
-    } catch (e) {
-      console.log("Non-JSON message:", msg);
+  const handleBack = () => {
+    // Clean up resources before navigating
+    if (state === "streaming") {
+      stopFrameSending();
+      stopMedia();
+      setDetections([]);
     }
-  });
+    navigate("/Home");
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+      stopFrameSending();
+      stopMedia();
+    };
+  }, []);
+
+  const socket = useSocket(
+    `ws://localhost:8000/ws?token=${token}`,
+    (msg) => {
+      try {
+        const data = JSON.parse(msg);
+        console.log("Detection:", data);
+
+        if (data.type === "detection" && data.detections) {
+          addDetections(data.detections);
+          setDetections(data.detections);
+
+          // Add to logs
+          data.detections.forEach((det) => {
+            const logEntry = {
+              id: Date.now() + Math.random(),
+              action: det.class,
+              timestamp: det.timestamp,
+              confidence: det.confidence,
+            };
+            console.log("New detection log:", logEntry);
+          });
+        } else {
+          setDetections([]);
+        }
+      } catch (e) {
+        console.error("Error parsing WebSocket message:", e);
+        setError("Error receiving detection data");
+      }
+    },
+    (error) => {
+      console.error("WebSocket error:", error);
+      setError("Connection error. Please check your connection and try again.");
+    }
+  );
 
   const { start: startFrameSending, stop: stopFrameSending } = useFrameSender(
     socket.send
   );
+
+  // Check if stream processing is complete
+  const checkStreamEnd = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("token", token);
+
+      const response = await fetch("http://localhost:8000/tasks_finished", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to check stream status");
+      }
+
+      const data = await response.json();
+      console.log("Stream status:", data);
+      return data.finished || false;
+    } catch (error) {
+      console.error("Error checking stream status:", error);
+      // Return true to stop polling on error
+      return true;
+    }
+  };
+
+  const handleEndStream = async () => {
+    try {
+      setIsEnding(true);
+      setError(null);
+
+      // Stop media and frame sending immediately
+      stopFrameSending();
+      stopMedia();
+      setDetections([]);
+
+      pollingIntervalRef.current = setInterval(async () => {
+        const isComplete = await checkStreamEnd();
+        console.log(isComplete);
+        if (isComplete) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+          setIsEnding(false);
+          setState("selection");
+          resetLogs();
+          navigate(`/Gallery`);
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("Error ending stream:", error);
+      setError("Failed to end stream properly. Please try again.");
+      setIsEnding(false);
+
+      // Cleanup anyway
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+  };
 
   // Draw bounding boxes on canvas
   useEffect(() => {
@@ -61,52 +156,68 @@ function RealTime({ onBack }) {
     const video = videoRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Match canvas size to video size
-    canvas.width = video.videoWidth || video.clientWidth;
-    canvas.height = video.videoHeight || video.clientHeight;
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return;
+    }
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    try {
+      // Match canvas size to video size
+      canvas.width = video.videoWidth || video.clientWidth;
+      canvas.height = video.videoHeight || video.clientHeight;
 
-    // Draw bounding boxes
-    detections.forEach((det) => {
-      const { x1, y1, x2, y2 } = det.bbox;
-      const width = x2 - x1;
-      const height = y2 - y1;
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Scale coordinates to canvas size
-      const scaleX = canvas.width / video.videoWidth;
-      const scaleY = canvas.height / video.videoHeight;
+      // Draw bounding boxes
+      detections.forEach((det) => {
+        if (!det.bbox) return;
 
-      const scaledX = x1 * scaleX;
-      const scaledY = y1 * scaleY;
-      const scaledWidth = width * scaleX;
-      const scaledHeight = height * scaleY;
+        const { x1, y1, x2, y2 } = det.bbox;
+        const width = x2 - x1;
+        const height = y2 - y1;
 
-      // Draw box
-      ctx.strokeStyle = "#00ff00";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
+        // Scale coordinates to canvas size
+        const scaleX = canvas.width / video.videoWidth;
+        const scaleY = canvas.height / video.videoHeight;
 
-      // Draw label background
-      const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
-      ctx.font = "16px Arial";
-      const textWidth = ctx.measureText(label).width;
+        const scaledX = x1 * scaleX;
+        const scaledY = y1 * scaleY;
+        const scaledWidth = width * scaleX;
+        const scaledHeight = height * scaleY;
 
-      ctx.fillStyle = "#00ff00";
-      ctx.fillRect(scaledX, scaledY - 25, textWidth + 10, 25);
+        // Draw box
+        ctx.strokeStyle = "#00ff00";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
 
-      // Draw label text
-      ctx.fillStyle = "#000";
-      ctx.fillText(label, scaledX + 5, scaledY - 7);
-    });
+        // Draw label background
+        const label = `${det.class} ${(det.confidence * 100).toFixed(0)}%`;
+        ctx.font = "16px Arial";
+        const textWidth = ctx.measureText(label).width;
+
+        ctx.fillStyle = "#00ff00";
+        ctx.fillRect(scaledX, scaledY - 25, textWidth + 10, 25);
+
+        // Draw label text
+        ctx.fillStyle = "#000";
+        ctx.fillText(label, scaledX + 5, scaledY - 7);
+      });
+    } catch (error) {
+      console.error("Error drawing detections:", error);
+    }
   }, [detections]);
 
   useEffect(() => {
     if (state === "streaming" && videoRef.current) {
       const videoElement = videoRef.current;
       const onLoaded = () => {
-        startFrameSending(videoElement, 10); // send 4 FPS
+        try {
+          startFrameSending(videoElement, 10); // send 10 FPS
+        } catch (error) {
+          console.error("Error starting frame sending:", error);
+          setError("Failed to start frame sending");
+        }
       };
 
       videoElement.addEventListener("loadeddata", onLoaded);
@@ -126,10 +237,15 @@ function RealTime({ onBack }) {
     stopStream: stopMedia,
   } = useMediaStream();
 
-  const { logs, startSimulation, stopSimulation, resetLogs } = useDetections();
+  const { logs, addDetections, resetLogs } = useDetections();
 
   useEffect(() => {
-    loadAvailableSources();
+    try {
+      loadAvailableSources();
+    } catch (error) {
+      console.error("Error loading sources:", error);
+      setError("Failed to load available sources");
+    }
   }, []);
 
   useEffect(() => {
@@ -141,7 +257,12 @@ function RealTime({ onBack }) {
 
   useEffect(() => {
     if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+      try {
+        videoRef.current.srcObject = stream;
+      } catch (error) {
+        console.error("Error setting video stream:", error);
+        setError("Failed to display video stream");
+      }
     }
   }, [stream]);
 
@@ -152,22 +273,11 @@ function RealTime({ onBack }) {
       await requestAndStartStream(source);
       setState("streaming");
       resetLogs();
-      startSimulation();
     } catch (error) {
       console.error("Failed to start stream:", error);
       setError("Failed to access the selected source. Please try again.");
       setState("selection");
     }
-  };
-
-  const handleStop = () => {
-    stopFrameSending();
-    stopSimulation();
-    stopMedia();
-    resetLogs();
-    setDetections([]);
-    setState("selection");
-    setError(null);
   };
 
   const getActionIcon = (action) => {
@@ -189,15 +299,17 @@ function RealTime({ onBack }) {
     return (
       <div className="detection-page">
         <div className="detection-container">
-          <button
-            onClick={onBack}
-            className="back-button"
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-          >
-            <ArrowLeft size={20} />
-            <span>Back to Home</span>
-          </button>
+          {!isEnding && (
+            <button
+              onClick={handleBack}
+              className="back-button"
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            >
+              <ArrowLeft size={20} />
+              <span>Back to Home</span>
+            </button>
+          )}
 
           <div className="selection-section">
             <h2 className="selection-title">Select Input Source</h2>
@@ -237,15 +349,17 @@ function RealTime({ onBack }) {
     return (
       <div className="detection-page">
         <div className="detection-container">
-          <button
-            onClick={onBack}
-            className="back-button"
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-          >
-            <ArrowLeft size={20} />
-            <span>Back to Home</span>
-          </button>
+          {!isEnding && (
+            <button
+              onClick={handleBack}
+              className="back-button"
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            >
+              <ArrowLeft size={20} />
+              <span>Back to Home</span>
+            </button>
+          )}
 
           <div className="selection-section">
             <div className="requesting-content">
@@ -268,24 +382,72 @@ function RealTime({ onBack }) {
   return (
     <div className="detection-page">
       <div className="detection-container streaming">
-        <button
-          onClick={onBack}
-          className="back-button"
-          onMouseEnter={(e) => (e.currentTarget.style.color = "#cbd5e1")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
-        >
-          <ArrowLeft size={20} />
-          <span>Back to Home</span>
-        </button>
-
         <div className="streaming-content">
           <div className="stream-section">
             <div className="stream-header">
               <h2 className="stream-title">Live Detection Stream</h2>
-              <button onClick={handleStop} className="stop-button">
-                Stop Stream
+              <button
+                onClick={handleEndStream}
+                className="stop-button"
+                disabled={isEnding}
+                style={{
+                  opacity: isEnding ? 0.6 : 1,
+                  cursor: isEnding ? "not-allowed" : "pointer",
+                }}
+              >
+                {isEnding ? (
+                  <>
+                    <Loader2 size={16} className="spinner" />
+                    Ending Stream...
+                  </>
+                ) : (
+                  "End Stream"
+                )}
               </button>
             </div>
+
+            {isEnding && (
+              <div
+                style={{
+                  marginBottom: "1rem",
+                  padding: "1rem",
+                  backgroundColor: "rgba(59, 130, 246, 0.1)",
+                  borderRadius: "0.5rem",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    color: "#3b82f6",
+                  }}
+                >
+                  <Loader2 size={20} className="spinner" />
+                  <span>Processing stream data, please wait...</span>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div
+                style={{
+                  marginBottom: "1rem",
+                  padding: "1rem",
+                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                  borderRadius: "0.5rem",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "#ef4444",
+                }}
+              >
+                <AlertCircle size={20} />
+                <span>{error}</span>
+              </div>
+            )}
 
             <div className="video-container" style={{ position: "relative" }}>
               <video

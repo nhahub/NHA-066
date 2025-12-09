@@ -13,6 +13,7 @@ import base64
 from routes.userAuth import router as authRoute
 from routes.gallery import router as galleryRoute
 from routes.clips import router as clipRoutes
+from DBconnect.DBconnection import router as clipStateRoute
 from services.hasher import tokenizer
 from DBconnect.DBconnection import add_video
 from WebSocket.websocket_manager import WebSocketManager
@@ -26,11 +27,13 @@ from classes.VideoRecorder import VideoRecorder
 app = FastAPI()
 reporter = ReporterAPI()
 ws_manager = WebSocketManager()
-yolo_model = YOLO("./Models/fire_model.pt")
+yolo_model = YOLO("./Models/best.pt")
 tokenizer = tokenizer()
 
 active_users = {}          # connection_id → userId
 active_realtime_names = {} # connection_id → videoName
+user_tasks = {}
+
 
 
 
@@ -51,6 +54,7 @@ app.add_middleware(
 app.include_router(authRoute)
 app.include_router(galleryRoute)
 app.include_router(clipRoutes)
+app.include_router(clipStateRoute)
 
 
 

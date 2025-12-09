@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 import json
 from  Helpers.imageDecoder import image_to_base64
 import re
+from datetime import datetime,timedelta
 
 def clean_filename(name: str) -> str:
     return re.sub(r'[^A-Za-z0-9_\-\.]', '_', name)
@@ -90,12 +91,15 @@ async def getClipList(token: str = Form(...), videoName: str = Form(...)):
     clipObj = []
     for clip in clips:
         if(videoName[:8] == "RealTime"):
+            end_time_str = clip.get("clipName").split(' - ')[1]
+            end_time_obj = datetime.strptime(end_time_str, "%H:%M:%S") + timedelta(seconds=2)
+            end_time_formatted = end_time_obj.strftime("%H:%M:%S")
             clipObj.append(
                     {
                 "id": clip.get("clipName"),
                 "thumbnail": image_to_base64(clip.get("thumbnail")),
                 "startTime": clip.get("clipName").split(' - ')[0],
-                "endTime": clip.get("clipName").split(' - ')[1][:-4],
+                "endTime": end_time_formatted,
                 "description":clip.get("summary"),
                 },
                 )
